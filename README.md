@@ -1,107 +1,73 @@
-# Personalized FoG Detection for Parkinson's Disease
+# Parkinson's Disease Detection
 
-Freezing of Gait (FoG) detection system that **adapts to each individual patient**
-rather than using a one-size-fits-all model.
-
-Three approaches were developed and compared under a Leave-One-Patient-Out protocol
-on the FoG-STAR dataset (16 patients with FoG events, 60 Hz IMU).
-
-**We moved forward with Approach C** — see [docs/why_approach_c.md](docs/why_approach_c.md).
+Personalized detection system across two modalities — body sensors (FoG) and voice recordings — using three algorithms per dataset.
 
 ---
 
-## Approaches
+## Sensor Data (FoG-STAR — IMU / Accelerometers)
 
-| | Approach | F1 (n=0) | Sensitivity | FoG Episode Detection |
-|---|---|:---:|:---:|:---:|
-| A | [Bayesian Personalized Ensemble](docs/approach_a.md) | 0.396 | 0.338 | 32.1% |
-| B | [SSL Pre-training + LoRA](docs/approach_b.md) | 0.400 | 0.503 | 52.3% |
-| C | [Personalized Outlier Detection](docs/approach_c.md) | **0.427** | **0.788** | **81.6%** |
+Freezing of Gait detection from 60 Hz wrist/ankle/back sensors, 16 patients, leave-one-patient-out evaluation.
 
----
-
-## Project Structure
-
-```
-parkinsons/
-  src/
-    data/
-      fog_star_loader.py     # FoG-STAR dataset loader
-      windowing.py           # 2s sliding windows, 50% overlap
-      features.py            # 339 handcrafted IMU features
-    models/
-      base_ensemble.py       # Approach A: XGBoost specialists
-      bayesian_gating.py     # Approach A: Dirichlet gating
-      transformer_mae.py     # Approach B: T-MAE self-supervised encoder
-      lora_adapter.py        # Approach B: LoRA personalisation adapters
-      personalized_detector.py  # Approach B: full detector
-      outlier_detector.py    # Approach C: Isolation Forest + Freeze Index
-    training/
-      pretrain.py            # T-MAE pre-training script
-      finetune.py            # LoRA fine-tuning
-      online_adapt.py        # Continual adaptation
-      evaluate.py            # Shared evaluation utilities
-    utils/
-      clinical.py            # Clinical profile similarity
-      label_cleaning.py      # FoG label noise handling
-      metrics.py             # Window + event-level metrics
-  docs/
-    approach_a.md            # Approach A explanation
-    approach_b.md            # Approach B explanation
-    approach_c.md            # Approach C explanation
-    why_approach_c.md        # Recommendation rationale
-  results/
-    figures/                 # Performance plots + cluster visualisation
-    *.json                   # LOPO evaluation results per approach
-    summary_metrics.csv      # Combined metrics table
-  run_evaluation.py          # Run Approach A + B LOPO evaluation
-  run_approach_c.py          # Run Approach C LOPO evaluation + export
-  make_figures.py            # Generate all comparison figures
-  configs/default.yaml       # Hyperparameter configuration
-```
+| Figure | Description |
+|--------|-------------|
+| ![](results/figures/combined_acc_f1_roc_mean.png) | Mean ± 1 SD for Accuracy, F1, and AUC-ROC across all patients as adaptation data increases. |
+| ![](results/figures/combined_all_metrics.png) | All six metrics (including sensitivity, specificity, episode detection rate) for all three approaches. |
+| ![](results/figures/per_patient_f1_all.png) | Individual F1 curves per patient for every approach. |
+| ![](results/figures/per_patient_bars_n0.png) | Per-patient bar comparison with zero patient-specific data. |
+| ![](results/figures/per_patient_bars_n50.png) | Per-patient bar comparison after 50 patient-specific windows. |
+| ![](results/figures/approach_c_cluster_outliers.png) | PCA showing normal-gait cluster vs FoG outliers detected by Approach C. |
 
 ---
 
-## Quick Start
+## Voice Data (Parkinson Speech Dataset — Acoustic Features)
 
-### Requirements
+Parkinson's disease detection from 26 acoustic voice features, 40 patients, leave-one-patient-out evaluation.
+
+| Figure | Description |
+|--------|-------------|
+| ![](results/figures/speech_combined_metrics_mean.png) | F1, sensitivity, specificity, and AUC across all patients as adaptation recordings increase. |
+| ![](results/figures/speech_per_patient_f1.png) | Individual F1 curves per patient for every approach. |
+| ![](results/figures/speech_per_patient_bars_n0.png) | Per-patient bar comparison with zero patient-specific recordings. |
+| ![](results/figures/speech_per_patient_bars_n20.png) | Per-patient bar comparison after 20 patient-specific recordings. |
+| ![](results/figures/speech_approach_c_cluster_outliers.png) | PCA showing healthy voice cluster vs Parkinson's outliers detected by Approach C. |
+
+---
+
+## Algorithms
+
+### A — Bayesian Personalized Ensemble
+- XGBoost specialists trained per activity context, combined via Dirichlet-Multinomial Bayesian gating.
+- Clinical similarity to other patients initialises the prior; updates online with each new labelled sample.
+- **Sensor: F1 0.396 → 0.412 | Voice: F1 0.723** — strong cold-start on voice, weaker FoG sensitivity.
+- Details: [docs/approach_a.md](docs/approach_a.md) · Code: [src/models/base_ensemble.py](src/models/base_ensemble.py), [src/models/bayesian_gating.py](src/models/bayesian_gating.py)
+
+### B — SSL Pre-training + Fine-tuning
+- Sensor: Transformer masked autoencoder (T-MAE) pre-trained on raw IMU, then LoRA adapters personalise per patient. Voice: MLP fine-tuned per patient.
+- No labels needed for pre-training; only a handful of labelled samples required to adapt.
+- **Sensor: F1 0.400 → 0.443 | Voice: F1 0.771** — best cold-start on voice, moderate FoG improvement.
+- Details: [docs/approach_b.md](docs/approach_b.md) · Code: [src/models/transformer_mae.py](src/models/transformer_mae.py), [src/models/lora_adapter.py](src/models/lora_adapter.py)
+
+### C — Personalized Outlier Detection ✓ Selected
+- Isolation Forest trained only on the patient's normal (non-FoG / healthy) data; anomalies flagged as disease.
+- No disease labels ever required — only examples of normal behaviour, making real-world data collection trivial.
+- **Sensor: F1 0.427 → 0.553, episode detection 81.6% | Voice: F1 0.535 → 0.873** — best personalisation gain across both modalities.
+- Details: [docs/approach_c.md](docs/approach_c.md) · Why chosen: [docs/why_approach_c.md](docs/why_approach_c.md) · Code: [src/models/outlier_detector.py](src/models/outlier_detector.py)
+
+---
+
+## Run
+
 ```bash
 pip install numpy pandas scipy scikit-learn xgboost torch matplotlib joblib
-```
 
-### Run Approach C (recommended)
-```bash
-python run_approach_c.py
-```
-
-### Generate all figures
-```bash
+# Sensor (FoG-STAR)
+python run_approach_c.py        # Approach C — recommended
+python run_evaluation.py        # Approaches A + B
 python make_figures.py
+
+# Voice (Speech dataset)
+python run_speech_approach_c.py
+python run_speech_approach_a.py
+python run_speech_approach_b.py
+python make_speech_figures.py
 ```
-
-### Run full evaluation (all approaches)
-```bash
-python run_evaluation.py  # Approaches A + B
-python run_approach_c.py  # Approach C
-```
-
----
-
-## Dataset
-
-The FoG-STAR dataset (`datasets/fog/`) is not included in this repository due to
-size and data governance. Place the dataset at `datasets/fog/` with:
-- `sensor_data.csv` — 60 Hz IMU data, 24 channels, all subjects
-- `clinical_data.csv` — demographic and clinical features per subject
-
----
-
-## Key Results
-
-**Approach C at n=50 personalisation windows:**
-- F1: 0.553
-- Sensitivity: 0.801 (detects 4 in 5 FoG episodes)
-- FoG Episode Detection Rate: 87.4%
-
-See [results/figures/](results/figures/) for full visualisations including the
-cluster/outlier plot showing how FoG windows separate from normal gait in PCA space.
