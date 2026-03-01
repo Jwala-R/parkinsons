@@ -1,0 +1,68 @@
+# Personalized FoG Detection - Default Configuration
+
+data:
+  fog_star_path: "datasets/fog/sensor_data.csv"
+  fog_star_clinical_path: "datasets/fog/clinical_data.csv"
+  fog2_path: "datasets/r8gmbtv7w2-3"
+  sampling_rate: 60  # Hz (fog2 will be resampled from 500Hz)
+  fog2_original_sr: 500
+
+windowing:
+  window_seconds: 2.0
+  overlap: 0.5  # 50% overlap
+  label_threshold: 0.5  # majority voting threshold for window label
+
+features:
+  freeze_index_bands:
+    locomotion: [0.5, 3.0]  # Hz
+    freeze: [3.0, 8.0]      # Hz
+  spectral_bands:
+    - [0.5, 3.0]
+    - [3.0, 8.0]
+    - [8.0, 20.0]
+
+ensemble:
+  n_specialists: 5
+  xgboost:
+    n_estimators: 200
+    max_depth: 6
+    learning_rate: 0.1
+    scale_pos_weight: 4.0  # ~80/20 class imbalance
+  bayesian_prior_kernel_bandwidth: 1.0
+
+transformer:
+  d_model: 128
+  n_heads: 4
+  n_encoder_layers: 4
+  n_decoder_layers: 2
+  d_ff: 256
+  dropout: 0.1
+  patch_size: 4  # samples per patch
+
+lora:
+  rank: 4
+  alpha: 8
+  dropout: 0.05
+
+training:
+  pretrain:
+    epochs: 100
+    batch_size: 256
+    lr: 1.0e-3
+    mask_ratio: 0.5
+    weight_decay: 1.0e-4
+  finetune:
+    epochs: 50
+    batch_size: 64
+    lr: 5.0e-4
+    weight_decay: 1.0e-4
+  online:
+    adaptation_steps: 10
+    adaptation_lr: 1.0e-4
+    replay_buffer_size: 500
+    pseudo_label_threshold: 0.9
+    drift_threshold: 3.0  # Mahalanobis distance
+
+evaluation:
+  metrics: ["sensitivity", "specificity", "f1", "auroc"]
+  lopo: true  # leave-one-patient-out
