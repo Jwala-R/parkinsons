@@ -91,7 +91,7 @@ class PersonalizedOutlierDetector:
     def fit(
         self,
         normal_features: np.ndarray,
-        normal_windows: np.ndarray,
+        normal_windows: np.ndarray | None = None,
         contamination: float = 0.2,
     ) -> "PersonalizedOutlierDetector":
         """
@@ -118,24 +118,29 @@ class PersonalizedOutlierDetector:
     def score(
         self,
         features: np.ndarray,
-        windows: np.ndarray,
+        windows: np.ndarray | None = None,
         fs: float = 60.0,
     ) -> np.ndarray:
         """
-        Compute anomaly scores for each window (higher = more FoG-like).
+        Compute anomaly scores for each window (higher = more anomalous).
 
         Args:
             features: (n, n_features) handcrafted features
-            windows:  (n, win_len, n_channels) raw IMU data
-            fs:       sampling rate
+            windows:  (n, win_len, n_channels) raw IMU data, or None.
+                      When None the Freeze Index term is skipped and only
+                      the Isolation Forest score is used.
+            fs:       sampling rate (used only when windows is provided)
 
         Returns:
             scores: (n,) anomaly scores in [0, 1]
         """
         feat_scaled = self.scaler_.transform(features)
         if_scores = -self.iso_forest_.score_samples(feat_scaled)  # higher = more anomalous
-        fi_scores = compute_freeze_index_batch(windows, fs=fs)
 
+        if windows is None:
+            return _normalize_01(if_scores)
+
+        fi_scores = compute_freeze_index_batch(windows, fs=fs)
         return (self.if_weight * _normalize_01(if_scores) +
                 self.fi_weight * _normalize_01(fi_scores))
 
@@ -185,15 +190,15 @@ class PersonalizedOutlierEnsemble:
     def fit_population(
         self,
         train_features: np.ndarray,
-        train_windows: np.ndarray,
+        train_windows: np.ndarray | None,
         train_labels: np.ndarray,
     ) -> "PersonalizedOutlierEnsemble":
-        """Fit the population-level normal gait model on all training non-FoG."""
+        """Fit the population-level normal model on all training non-anomaly samples."""
         nfog_mask = train_labels == 0
         contamination = float(np.clip(train_labels.mean(), 0.01, 0.49))
         self.pop_detector_.fit(
             train_features[nfog_mask],
-            train_windows[nfog_mask],
+            train_windows[nfog_mask] if train_windows is not None else None,
             contamination=contamination,
         )
         self.pop_fitted_ = True
@@ -202,7 +207,7 @@ class PersonalizedOutlierEnsemble:
     def score_and_predict(
         self,
         test_features: np.ndarray,
-        test_windows: np.ndarray,
+        test_windows: np.ndarray | None,
         test_labels: np.ndarray,
         n_seed_nonfog: int = 0,
         fs: float = 60.0,
@@ -235,9 +240,10 @@ class PersonalizedOutlierEnsemble:
                 n_estimators=self.n_estimators,
                 fi_weight=self.fi_weight,
             )
+            seed_wins = test_windows[seed_idx] if test_windows is not None else None
             patient_det.fit(
                 test_features[seed_idx],
-                test_windows[seed_idx],
+                seed_wins,
                 contamination=contam,
             )
 
@@ -246,7 +252,7 @@ class PersonalizedOutlierEnsemble:
             blend_w = min(1.0, n_seed_nonfog / 50.0)
 
             eval_feat = test_features[eval_idx]
-            eval_win  = test_windows[eval_idx]
+            eval_win  = test_windows[eval_idx] if test_windows is not None else None
             eval_lbl  = test_labels[eval_idx]
 
             pop_scores     = self.pop_detector_.score(eval_feat, eval_win, fs)
