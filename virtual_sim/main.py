@@ -31,7 +31,7 @@ for p in [_REPO_ROOT, _ML_ROOT]:
 
 def parse_args():
     parser = argparse.ArgumentParser(description="FoG Therapy Simulator")
-    parser.add_argument("--task",      choices=["walking", "eating"],
+    parser.add_argument("--task",      choices=["eating", "whackamole"],
                         help="Task to run (skips menu prompt)")
     parser.add_argument("--mode",      choices=["demo", "live"],
                         help="Connection mode (skips menu prompt)")
@@ -54,8 +54,8 @@ def text_menu() -> dict:
     print("  Parkinson's Neuroplasticity Training")
     print("=" * 50)
     print("  Select task:")
-    print("    [W] Walking — walk down a corridor")
-    print("    [E] Eating  — practice using a spoon")
+    print("    [E] Eating       — practice using a spoon")
+    print("    [M] Whack-a-Mole — tilt wrist to aim, squeeze to whack")
     print()
     print("  Select mode:")
     print("    [D] Demo mode (no Arduino needed)")
@@ -68,15 +68,15 @@ def text_menu() -> dict:
     mode = None
 
     while task is None:
-        c = input("Task [W/E]: ").strip().upper()
-        if c == "W":
-            task = "walking"
-        elif c == "E":
+        c = input("Task [E/M]: ").strip().upper()
+        if c == "E":
             task = "eating"
+        elif c == "M":
+            task = "whackamole"
         elif c == "Q":
             sys.exit(0)
         else:
-            print("  Enter W or E.")
+            print("  Enter E or M.")
 
     while mode is None:
         c = input("Mode [D/L]: ").strip().upper()
@@ -150,13 +150,14 @@ def main():
     haptic = HapticController(comm)
 
     # ── Task ───────────────────────────────────────────────────────────────
-    if cfg["task"] == "walking":
-        from virtual_sim.tasks.walking import WalkingTask
-        task = WalkingTask()
-    else:
+    if cfg["task"] == "eating":
         from virtual_sim.tasks.eating import EatingTask
         task = EatingTask()
-        haptic.set_pattern("triple")   # rhythmic cueing for eating
+        haptic.set_pattern("triple")
+    else:  # whackamole
+        from virtual_sim.tasks.whackamole import WhackAMoleTask
+        task = WhackAMoleTask()
+        haptic.set_pattern("triple")
 
     # ── Launch Panda3D app ─────────────────────────────────────────────────
     from virtual_sim.sim.app import SimApp

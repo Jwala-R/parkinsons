@@ -19,13 +19,10 @@ Feed detection:
   of a successful scoop.
 
 FoG behaviour:
-  Spoon jitters, table shakes, red overlay text appears.
-  HapticController triple-pulse fires.
+  Haptic pressure pulse only — no changes to gameplay or visuals.
 """
 
 import time
-import math
-import random
 
 from panda3d.core import (
     NodePath, CardMaker, CullFaceAttrib, LPoint3,
@@ -66,9 +63,7 @@ class EatingTask(BaseTask):
         self._bowl_highlight: NodePath | None = None
         self._mouth_highlight: NodePath | None = None
 
-        self._fog_label: OnscreenText | None = None
         self._feedback_label: OnscreenText | None = None
-        self._fog_shake_t = 0.0
         self._feedback_until = 0.0   # wall-clock time when label clears
         self._last_update = time.monotonic()
 
@@ -191,20 +186,6 @@ class EatingTask(BaseTask):
         dt = now - self._last_update
         self._last_update = now
 
-        # ── FoG visual effects ─────────────────────────────────────────────
-        if is_fog:
-            self._show_fog_label()
-            self._fog_shake_t += dt
-            if self._table_node:
-                self._table_node.setX(math.sin(self._fog_shake_t * 20) * 0.018)
-            self._spoon_x += random.uniform(-0.04, 0.04)
-            self._spoon_z += random.uniform(-0.025, 0.025)
-        else:
-            self._hide_fog_label()
-            self._fog_shake_t = 0.0
-            if self._table_node:
-                self._table_node.setX(0)
-
         # ── Feedback label timer ───────────────────────────────────────────
         if self._feedback_label and now >= self._feedback_until and self._feedback_until > 0:
             self._feedback_label.setText("")
@@ -219,22 +200,21 @@ class EatingTask(BaseTask):
                 self._feedback_label.setText("Grip lost!")
                 self._feedback_until = now + 1.5
 
-            if not is_fog:
-                acc_x = frame_data["acc"][0]   # lateral tilt  -> left/right
-                acc_y = frame_data["acc"][1]   # vertical swing -> up/down
+            acc_x = frame_data["acc"][0]   # lateral tilt  -> left/right
+            acc_y = frame_data["acc"][1]   # vertical swing -> up/down
 
-                # Scale sensor range to comfortable table-space range
-                target_x = acc_x * 0.35         # ±9 m/s^2 -> ±3.15 world units
-                target_z = 1.05 + acc_y * 0.08  # centred above table
+            # Scale sensor range to comfortable table-space range
+            target_x = acc_x * 0.35         # ±9 m/s^2 -> ±3.15 world units
+            target_z = 1.05 + acc_y * 0.08  # centred above table
 
-                self._spoon_x = (
-                    self._ema_alpha * target_x
-                    + (1 - self._ema_alpha) * self._spoon_x
-                )
-                self._spoon_z = (
-                    self._ema_alpha * target_z
-                    + (1 - self._ema_alpha) * self._spoon_z
-                )
+            self._spoon_x = (
+                self._ema_alpha * target_x
+                + (1 - self._ema_alpha) * self._spoon_x
+            )
+            self._spoon_z = (
+                self._ema_alpha * target_z
+                + (1 - self._ema_alpha) * self._spoon_z
+            )
 
         self._update_spoon_node()
         self._update_highlights()
@@ -315,23 +295,6 @@ class EatingTask(BaseTask):
                 self._feedback_until = now + 1.8
                 if self._scoops >= EAT_TARGET_SCOOPS:
                     self._complete = True
-
-    def _show_fog_label(self):
-        if self._fog_label is None:
-            self._fog_label = OnscreenText(
-                text="Movement frozen -- rhythmic cue sent",
-                pos=(0, 0.15),
-                scale=0.07,
-                fg=(1.0, 0.3, 0.3, 1.0),
-                shadow=(0, 0, 0, 0.6),
-                shadowOffset=(0.04, 0.04),
-                align=TextNode.ACenter,
-            )
-
-    def _hide_fog_label(self):
-        if self._fog_label is not None:
-            self._fog_label.destroy()
-            self._fog_label = None
 
 
 # ── Geometry helpers ───────────────────────────────────────────────────────────

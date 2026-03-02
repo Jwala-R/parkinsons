@@ -54,3 +54,9 @@ WALK_STEP_THRESHOLD = 0.3       # g — arm swing peak to count as step
 EAT_TARGET_SCOOPS  = 5
 EAT_PRESSURE_MIN   = 30.0       # FSR value below which grip is "lost"
 EAT_FEED_TIMEOUT   = 2.0        # seconds to complete feed after scoop
+
+# Whack-a-mole task
+WHACK_TARGET_HITS  = 10         # hits required to complete the game
+WHACK_PRESSURE_MIN = 40.0       # FSR threshold for a whack (squeeze)
+MOLE_VISIBLE_S     = 2.5        # seconds a mole stays up before ducking
+MOLE_INTERVAL_S    = 1.2        # seconds between moles
