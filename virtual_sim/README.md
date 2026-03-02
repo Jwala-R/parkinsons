@@ -15,6 +15,9 @@ The simulator runs in two layers simultaneously:
 ## Games
 
 ### [E] Eating
+
+![Eating task](screenshots/eating.png)
+
 Kitchen table scene. Tilt your wrist to guide a spoon from a bowl to a mouth target. Complete 5 successful scoop-and-feed cycles.
 
 - `acc_x` (lateral tilt) → spoon left/right
@@ -22,6 +25,9 @@ Kitchen table scene. Tilt your wrist to guide a spoon from a bowl to a mouth tar
 - FSR pressure drop → grip lost
 
 ### [M] Whack-a-Mole
+
+![Whack-a-mole task](screenshots/whackamole.png)
+
 Arcade board scene. Tilt your wrist to aim a mallet cursor over the 3×3 grid, then squeeze the watch FSR sensor to whack moles as they pop up. Hit 10 moles to complete.
 
 - `acc_x` (lateral tilt) → cursor left/right
