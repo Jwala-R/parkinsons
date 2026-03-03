@@ -114,18 +114,16 @@
 
 ## Slide 3: Sensor FoG — Results Graphs
 
-**Figures to include:**
+![All metrics vs adaptation windows](ml/results/figures/combined_all_metrics.png)
+*All 6 metrics (sensitivity, specificity, F1, precision, event detection rate, AUC) vs. adaptation windows — all 3 approaches*
 
-`results/figures/combined_all_metrics.png`
-- All 6 metrics (sensitivity, specificity, F1, precision, event detection rate, AUC) vs. adaptation windows for all 3 approaches
+![Per-patient F1 cold-start](ml/results/figures/per_patient_bars_n0.png) ![Per-patient F1 n=50](ml/results/figures/per_patient_bars_n50.png)
+*Per-patient F1 at cold-start (n=0) and after 50 windows (n=50)*
 
-`results/figures/per_patient_bars_n0.png` + `per_patient_bars_n50.png`
-- Per-patient F1 bar charts at cold-start (n=0) and after 50 windows (n=50)
+![Approach C PCA cluster](ml/results/figures/approach_c_cluster_outliers.png)
+*PCA: normal-gait cluster vs FoG outliers detected by Approach C*
 
-`results/figures/approach_c_cluster_outliers.png`
-- PCA plot: normal-gait cluster vs FoG outliers detected by Approach C
-
-**Key numbers to annotate:**
+**Key numbers:**
 - Approach C event detection: **81.6%** vs A: 32.1%, B: 52.3% (cold-start)
 - Approach C F1 after adaptation: **0.553** (n=50), sensitivity **0.801**
 - Approach A highest specificity: **0.923** (n=0)
@@ -134,18 +132,16 @@
 
 ## Slide 4: Voice FoG — Results Graphs
 
-**Figures to include:**
+![Speech metrics vs recordings](ml/results/figures/speech_combined_metrics_mean.png)
+*F1, sensitivity, specificity, AUC curves across all 3 approaches as recordings accumulate*
 
-`results/figures/speech_combined_metrics_mean.png`
-- F1, sensitivity, specificity, AUC curves across all 3 approaches as recordings accumulate
+![Speech per-patient n=0](ml/results/figures/speech_per_patient_bars_n0.png) ![Speech per-patient n=20](ml/results/figures/speech_per_patient_bars_n20.png)
+*Per-patient comparison at n=0 and n=20 recordings*
 
-`results/figures/speech_per_patient_bars_n0.png` + `speech_per_patient_bars_n20.png`
-- Per-patient comparison at n=0 and n=20 recordings
+![Speech Approach C PCA](ml/results/figures/speech_approach_c_cluster_outliers.png)
+*PCA: healthy voice cluster vs Parkinson's outliers detected by Approach C*
 
-`results/figures/speech_approach_c_cluster_outliers.png`
-- PCA: healthy voice cluster vs Parkinson's outliers detected by Approach C
-
-**Key numbers to annotate:**
+**Key numbers:**
 - Approach C: F1 **0.535 → 0.873** (n=0 to n=20 recordings) — largest gain of any approach
 - Approach B: best cold-start F1 = **0.771**
 - Approach A: stable across adaptation (F1 ≈ 0.72)
@@ -180,11 +176,15 @@
 ## Slide 6: Virtual Environment — Patient Training & Exercise
 
 **Therapy Game 1: Eating Task**
+
+![Eating Task](virtual_sim/screenshots/eating.png)
 - Guide a spoon from bowl to mouth for 5 cycles using wrist tilt (acc_x) and swing (acc_y)
 - FSR pressure pad detects grip loss (spoon drop event)
 - Trains fine motor control and hand-eye coordination
 
 **Therapy Game 2: Whack-a-Mole**
+
+![Whack-a-Mole](virtual_sim/screenshots/whackamole.png)
 - 3×3 grid of moles; aim mallet cursor with wrist tilt, squeeze FSR to whack
 - Hit 10 moles to complete the session
 - Trains rapid wrist movement, reaction time, and grip strength
