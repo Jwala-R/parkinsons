@@ -48,6 +48,37 @@ MOCK_MODE          = False      # True = no Arduino required
 MOCK_FOG_INTERVAL  = 20.0       # seconds between synthetic FoG episodes
 MOCK_FOG_DURATION  = 5.0        # seconds per episode
 
+# ── BLE mode (Arduino Nano 33 BLE Rev2) ───────────────────────────────────────
+# The Arduino firmware must advertise with this name and expose the two UUIDs.
+# Set BLE_PAYLOAD_FORMAT = "csv" if the firmware sends comma-separated text
+# instead of the default 28-byte little-endian binary struct.
+BLE_DEVICE_NAME    = "FoG-Nano"
+BLE_IMU_CHAR_UUID  = "12345678-1234-1234-1234-123456789abd"
+BLE_HAPTIC_CHAR_UUID = "12345678-1234-1234-1234-123456789abe"
+BLE_PAYLOAD_FORMAT = "binary"   # "binary" (28-byte struct) or "csv"
+
+# ── Camera / hand-tracking mode ───────────────────────────────────────────────
+CAMERA_DEVICE_ID      = 0       # OpenCV device index (0 = default webcam)
+CAMERA_CALIB_FRAMES   = 60      # frames of still hand to capture for baseline
+CAMERA_SHOW_PREVIEW   = True    # show annotated webcam window alongside game
+
+# Scaling factors: wrist screen position (rel to calibration, range ~[-1,1])
+# is multiplied by these to produce acc_x / acc_y fed into the tasks.
+# Eating task:     target_x = acc_x * 0.35  (needs ±4.3 for full ±1.5 range)
+#                  target_z = 1.05 + acc_y * 0.08  (needs ±8 for full height)
+# Whack-a-mole:    similar proportions.
+# Increase these values if the cursor doesn't reach the edges of the play area.
+CAMERA_ACCEL_SCALE    = 27.0    # lateral (acc_x): wrist position -> game units
+CAMERA_ACCEL_SCALE_Y  = 54.0    # vertical (acc_y): wrist position -> game units
+CAMERA_GYRO_SCALE     = 2.0     # radians -> deg/s proxy (not used for movement)
+
+# Pinch gesture thresholds (normalised landmark distance, 0-1).
+# CAMERA_PINCH_OPEN  : thumb-index distance treated as "no squeeze" (pressure 0)
+# CAMERA_PINCH_CLOSED: distance treated as "full squeeze" (pressure 1023)
+CAMERA_PINCH_OPEN     = 0.25
+CAMERA_PINCH_CLOSED   = 0.04
+CAMERA_PRESSURE_SCALE = 1023.0  # maps 0-1 pinch to FSR pressure range
+
 # ── Task parameters ───────────────────────────────────────────────────────────
 WALK_TARGET_STEPS  = 30
 WALK_STEP_THRESHOLD = 0.3       # g — arm swing peak to count as step

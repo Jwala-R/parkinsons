@@ -243,8 +243,11 @@ class WhackAMoleTask(BaseTask):
             target_x = acc_x * 0.30
             target_z = acc_y * 0.30
 
-            self._cur_x = self._ema_alpha * target_x + (1 - self._ema_alpha) * self._cur_x
-            self._cur_z = self._ema_alpha * target_z + (1 - self._ema_alpha) * self._cur_z
+            # Camera mode sends pre-smoothed position data — use direct mapping.
+            # IMU/serial modes need EMA to suppress jitter.
+            alpha = self._ema_alpha if abs(acc_x) < 15.0 else 1.0
+            self._cur_x = alpha * target_x + (1 - alpha) * self._cur_x
+            self._cur_z = alpha * target_z + (1 - alpha) * self._cur_z
 
         # ── FSR pressure -> whack ─────────────────────────────────────────
         if frame_data is not None:

@@ -207,14 +207,10 @@ class EatingTask(BaseTask):
             target_x = acc_x * 0.35         # ±9 m/s^2 -> ±3.15 world units
             target_z = 1.05 + acc_y * 0.08  # centred above table
 
-            self._spoon_x = (
-                self._ema_alpha * target_x
-                + (1 - self._ema_alpha) * self._spoon_x
-            )
-            self._spoon_z = (
-                self._ema_alpha * target_z
-                + (1 - self._ema_alpha) * self._spoon_z
-            )
+            # Camera sends pre-smoothed position — bypass EMA for direct response.
+            alpha = self._ema_alpha if abs(acc_x) < 15.0 else 1.0
+            self._spoon_x = alpha * target_x + (1 - alpha) * self._spoon_x
+            self._spoon_z = alpha * target_z + (1 - alpha) * self._spoon_z
 
         self._update_spoon_node()
         self._update_highlights()

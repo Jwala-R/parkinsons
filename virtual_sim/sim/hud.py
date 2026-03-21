@@ -15,7 +15,7 @@ import math
 import time
 from direct.gui.OnscreenText import OnscreenText
 from direct.gui.DirectFrame import DirectFrame
-from panda3d.core import TextNode, LColor
+from panda3d.core import TextNode, LColor, LineSegs, NodePath
 
 
 class HUD:
@@ -119,19 +119,208 @@ class HUD:
             self._border_left, self._border_right,
         ]
 
+        # ── Camera hand skeleton overlay (bottom-right) ───────────────────
+        # Drawn as LineSegs in aspect2d.  Only visible in camera mode.
+        self._hand_node: NodePath | None = None
+        self._hand_label = OnscreenText(
+            text="",
+            pos=(1.55, -0.60),
+            scale=0.045,
+            fg=(0.4, 0.9, 1.0, 1.0),
+            align=TextNode.ARight,
+            mayChange=True,
+        )
+
+        # ── Camera calibration overlay (shown until calibration completes) ─
+        self._calib_overlay_bg = DirectFrame(
+            frameColor=(0.0, 0.0, 0.0, 0.78),
+            frameSize=(-2.0, 2.0, -1.1, 1.1),
+            pos=(0, 0, 0),
+        )
+        self._calib_title = OnscreenText(
+            text="Camera Calibration",
+            pos=(0, 0.35),
+            scale=0.11,
+            fg=(0.4, 0.9, 1.0, 1.0),
+            align=TextNode.ACenter,
+            mayChange=False,
+        )
+        self._calib_instruction = OnscreenText(
+            text="Hold your hand still in front of the camera",
+            pos=(0, 0.18),
+            scale=0.07,
+            fg=(1.0, 1.0, 1.0, 1.0),
+            align=TextNode.ACenter,
+            mayChange=False,
+        )
+        self._calib_progress_bg = DirectFrame(
+            frameColor=(0.3, 0.3, 0.3, 1.0),
+            frameSize=(-0.6, 0.6, -0.03, 0.03),
+            pos=(0, 0, 0.0),
+        )
+        self._calib_progress_fill = DirectFrame(
+            frameColor=(0.3, 0.85, 0.4, 1.0),
+            frameSize=(-0.6, -0.6, -0.03, 0.03),  # zero width initially
+            pos=(0, 0, 0.0),
+        )
+        self._calib_count_text = OnscreenText(
+            text="0 / 60",
+            pos=(0, -0.10),
+            scale=0.065,
+            fg=(0.8, 0.8, 0.8, 1.0),
+            align=TextNode.ACenter,
+            mayChange=True,
+        )
+        self._calib_hand_status = OnscreenText(
+            text="Waiting for hand...",
+            pos=(0, -0.23),
+            scale=0.06,
+            fg=(1.0, 0.8, 0.3, 1.0),
+            align=TextNode.ACenter,
+            mayChange=True,
+        )
+        self._calib_elements = [
+            self._calib_overlay_bg, self._calib_title, self._calib_instruction,
+            self._calib_progress_bg, self._calib_progress_fill,
+            self._calib_count_text, self._calib_hand_status,
+        ]
+        self._calib_visible = False  # hidden until camera mode activates
+        self._set_calib_visible(False)
+
     # ── Per-frame update ───────────────────────────────────────────────────
 
-    def update(self, fog_score: float, is_fog: bool, progress: dict, live_mode: bool = False):
+    _MODE_LABELS = {
+        "demo":   "DEMO",
+        "live":   "LIVE",
+        "ble":    "BLE",
+        "camera": "CAM",
+    }
+
+    def update(self, fog_score: float, is_fog: bool, progress: dict,
+               live_mode: bool = False, mode: str = "demo"):
         """
         Update all HUD elements.
 
         progress: {"current": int, "total": int, "label": str}
+        mode: one of "demo", "live", "ble", "camera"
         """
         self._update_score_bar(fog_score)
         self._update_progress(progress)
         self._update_status(is_fog)
         self._update_border_flash(is_fog)
-        self._mode_text.setText("LIVE" if live_mode else "DEMO")
+        # Support old bool kwarg for backwards compatibility
+        if live_mode and mode == "demo":
+            mode = "live"
+        self._mode_text.setText(self._MODE_LABELS.get(mode, mode.upper()))
+
+    def _set_calib_visible(self, visible: bool):
+        fn = "show" if visible else "hide"
+        for el in self._calib_elements:
+            getattr(el, fn)()
+        self._calib_visible = visible
+
+    def update_hand(self, landmarks, calib_done: bool = True,
+                    calib_count: int = 0, calib_total: int = 60):
+        """
+        Drive the calibration overlay and hand skeleton.
+
+        landmarks   : list of 21 (x,y) tuples in [0,1] normalised coords, or None.
+        calib_done  : False = still calibrating, show full-screen overlay.
+        calib_count : how many calibration frames collected so far.
+        calib_total : total frames needed (CAMERA_CALIB_FRAMES).
+        """
+        # Remove previous skeleton node
+        if self._hand_node is not None:
+            self._hand_node.removeNode()
+            self._hand_node = None
+
+        if not calib_done:
+            # Show calibration overlay
+            if not self._calib_visible:
+                self._set_calib_visible(True)
+
+            # Progress bar
+            frac = min(1.0, calib_count / max(1, calib_total))
+            width = frac * 1.2   # bar spans -0.6 to +0.6 = 1.2 units total
+            self._calib_progress_fill["frameSize"] = (-0.6, -0.6 + width, -0.03, 0.03)
+            # Colour: orange -> green as it fills
+            r = 1.0 - frac * 0.7
+            g = 0.4 + frac * 0.5
+            self._calib_progress_fill["frameColor"] = (r, g, 0.2, 1.0)
+
+            self._calib_count_text.setText(f"{calib_count} / {calib_total}")
+
+            if landmarks is None:
+                self._calib_hand_status.setText("No hand detected — show hand to camera")
+                self._calib_hand_status["fg"] = (1.0, 0.4, 0.3, 1.0)
+            else:
+                self._calib_hand_status.setText("Hand detected — hold still!")
+                self._calib_hand_status["fg"] = (0.3, 1.0, 0.4, 1.0)
+                # Draw skeleton in centre of overlay during calibration
+                self._hand_node = self._draw_hand_skeleton(landmarks, centre=True)
+            return
+
+        # Calibration done — hide overlay
+        if self._calib_visible:
+            self._set_calib_visible(False)
+
+        if landmarks is None:
+            self._hand_label.setText("No hand")
+            return
+
+        self._hand_label.setText("Hand OK")
+        self._hand_node = self._draw_hand_skeleton(landmarks)
+
+    def _draw_hand_skeleton(self, landmarks: list, centre: bool = False) -> NodePath:
+        """
+        Render 21 hand landmarks as a skeleton.
+
+        centre=False: small overlay in bottom-right corner (normal gameplay).
+        centre=True:  large skeleton centred on screen (calibration overlay).
+        """
+        if centre:
+            BOX_X0, BOX_X1 = -0.55, 0.55
+            BOX_Y0, BOX_Y1 = -0.50, 0.16
+        else:
+            BOX_X0, BOX_X1 = 0.85, 1.58
+            BOX_Y0, BOX_Y1 = -0.95, -0.55
+
+        def to_screen(lm_x, lm_y):
+            # MediaPipe: x=0 left, x=1 right; y=0 top, y=1 bottom
+            sx = BOX_X0 + lm_x * (BOX_X1 - BOX_X0)
+            sy = BOX_Y1 - lm_y * (BOX_Y1 - BOX_Y0)   # flip Y
+            return sx, sy
+
+        # MediaPipe hand connection pairs
+        connections = [
+            (0,1),(1,2),(2,3),(3,4),           # thumb
+            (0,5),(5,6),(6,7),(7,8),            # index
+            (0,9),(9,10),(10,11),(11,12),        # middle
+            (0,13),(13,14),(14,15),(15,16),      # ring
+            (0,17),(17,18),(18,19),(19,20),      # pinky
+            (5,9),(9,13),(13,17),               # palm
+        ]
+
+        ls = LineSegs()
+        ls.setThickness(1.5)
+        ls.setColor(0.3, 0.85, 1.0, 0.85)
+
+        for a, b in connections:
+            ax, ay = to_screen(landmarks[a][0], landmarks[a][1])
+            bx, by = to_screen(landmarks[b][0], landmarks[b][1])
+            ls.moveTo(ax, 0, ay)
+            ls.drawTo(bx, 0, by)
+
+        # Dot at each landmark
+        ls.setThickness(4.0)
+        ls.setColor(1.0, 1.0, 0.3, 1.0)
+        for lx, ly in landmarks:
+            sx, sy = to_screen(lx, ly)
+            ls.moveTo(sx - 0.005, 0, sy)
+            ls.drawTo(sx + 0.005, 0, sy)
+
+        node = self._base.aspect2d.attachNewNode(ls.create())
+        return node
 
     # ── Cleanup ────────────────────────────────────────────────────────────
 

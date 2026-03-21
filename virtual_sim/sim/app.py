@@ -48,14 +48,19 @@ class SimApp(ShowBase):
     live_mode  : bool — True if connected to real Arduino
     """
 
-    def __init__(self, comm, detector, haptic, task, live_mode: bool = False):
+    def __init__(self, comm, detector, haptic, task,
+                 live_mode: bool = False, mode: str = "demo"):
         super().__init__()
 
         self._comm = comm
         self._detector = detector
         self._haptic = haptic
         self._task = task
-        self._live_mode = live_mode
+        # Support both old bool kwarg and new string mode kwarg
+        if mode != "demo":
+            self._mode = mode
+        else:
+            self._mode = "live" if live_mode else "demo"
 
         self._frame_queue: queue.Queue = queue.Queue(maxsize=30)
         self._fog_score = 0.0
@@ -67,7 +72,9 @@ class SimApp(ShowBase):
         props = WindowProperties()
         props.setTitle(WIN_TITLE)
         props.setSize(WIN_W, WIN_H)
+        props.setOrigin(100, 50)   # force top-left position so it appears on screen
         props.setUndecorated(False)
+        props.setForeground(True)
         self.win.requestProperties(props)
 
         self.setFrameRateMeter(True)
@@ -137,8 +144,17 @@ class SimApp(ShowBase):
             self._fog_score,
             self._is_fog,
             self._task.progress,
-            live_mode=self._live_mode,
+            mode=self._mode,
         )
+
+        # Camera mode: draw live hand skeleton overlay + calibration screen
+        if self._mode == "camera":
+            from virtual_sim.config import CAMERA_CALIB_FRAMES
+            lm = getattr(self._comm, "latest_landmarks", None)
+            cd = getattr(self._comm, "calib_done", False)
+            cc = getattr(self._comm, "calib_count", 0)
+            self._hud.update_hand(lm, cd, calib_count=cc,
+                                  calib_total=CAMERA_CALIB_FRAMES)
 
         # Check task completion (guard so we only fire once)
         if self._task.is_complete and not self._task_complete_shown:
