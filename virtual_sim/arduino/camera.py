@@ -229,9 +229,9 @@ class CameraHands:
                 label = f"Calibrating: {self.calib_count}/{CAMERA_CALIB_FRAMES}  ({remaining} left)"
                 color = (0, 200, 255)
             elif frame_data is not None:
-                ax, ay = frame_data["acc"][0], frame_data["acc"][1]
-                p = frame_data["pressure"]
-                label = f"acc=({ax:+.2f},{ay:+.2f})  pinch={p:.0f}"
+                pos = frame_data.get("pos", [0.0, 0.0])
+                p = frame_data.get("pressure", 0.0)
+                label = f"pos=({pos[0]:+.2f},{pos[1]:+.2f})  pinch={p:.0f}"
                 color = (60, 255, 100)
             else:
                 label = "No hand detected"
@@ -327,6 +327,7 @@ class CameraHands:
             "acc":      [acc_x, acc_y, acc_z],
             "gyro":     [gyro_x, gyro_y, gyro_z],
             "pressure": pressure,
+            "pos":      [rel_wx, -rel_wy],   # relative to calibration baseline, [-1,1]
         }
 
     def _calibrate(self, wx: float, wy: float, angle: float) -> Optional[dict]:
@@ -356,6 +357,7 @@ class CameraHands:
                 "acc":      [0.0, 0.0, 9.8],
                 "gyro":     [0.0, 0.0, 0.0],
                 "pressure": 0.0,
+                "pos":      [0.0, 0.0],
             }
         return None
 

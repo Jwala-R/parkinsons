@@ -71,6 +71,7 @@ CAMERA_SHOW_PREVIEW   = True    # show annotated webcam window alongside game
 CAMERA_ACCEL_SCALE    = 27.0    # lateral (acc_x): wrist position -> game units
 CAMERA_ACCEL_SCALE_Y  = 54.0    # vertical (acc_y): wrist position -> game units
 CAMERA_GYRO_SCALE     = 2.0     # radians -> deg/s proxy (not used for movement)
+CAMERA_SENSITIVITY    = 1.0     # whack-a-mole: 1:1 mapping, rel_wx * 0.8 = game units
 
 # Pinch gesture thresholds (normalised landmark distance, 0-1).
 # CAMERA_PINCH_OPEN  : thumb-index distance treated as "no squeeze" (pressure 0)

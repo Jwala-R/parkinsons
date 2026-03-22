@@ -41,6 +41,7 @@ from virtual_sim.config import (
     WHACK_PRESSURE_MIN,
     MOLE_VISIBLE_S,
     MOLE_INTERVAL_S,
+    CAMERA_SENSITIVITY,
 )
 
 
@@ -76,6 +77,7 @@ class WhackAMoleTask(BaseTask):
         self._cur_x = 0.0
         self._cur_z = 0.0
         self._ema_alpha = 0.18
+        self._debug_label = None
 
         # Mole state: index in 0-8, None = no active mole
         self._active_mole: int | None = None
@@ -211,6 +213,12 @@ class WhackAMoleTask(BaseTask):
             mayChange=False,
         )
 
+        self._debug_label = OnscreenText(
+            text="", pos=(-1.3, 0.92), scale=0.045,
+            fg=(1.0, 1.0, 0.3, 1.0), align=TextNode.ALeft,
+            mayChange=True,
+        )
+
         # Schedule first mole appearance
         self._next_mole_time = time.monotonic() + 1.0
 
@@ -236,18 +244,20 @@ class WhackAMoleTask(BaseTask):
 
         # ── Wrist motion -> cursor ────────────────────────────────────────
         if frame_data is not None:
-            acc_x = frame_data["acc"][0]
-            acc_y = frame_data["acc"][1]
-
-            # Map sensor range to grid range (±_CELL_SIZE * 1.1 world units)
-            target_x = acc_x * 0.30
-            target_z = acc_y * 0.30
-
-            # Camera mode sends pre-smoothed position data — use direct mapping.
-            # IMU/serial modes need EMA to suppress jitter.
-            alpha = self._ema_alpha if abs(acc_x) < 15.0 else 1.0
-            self._cur_x = alpha * target_x + (1 - alpha) * self._cur_x
-            self._cur_z = alpha * target_z + (1 - alpha) * self._cur_z
+            if "pos" in frame_data:
+                # pos is relative to calibration baseline, in [-1,1]
+                # Map directly: pos * CELL_SIZE * sensitivity = game cursor
+                rel_x, rel_y = frame_data["pos"][0], frame_data["pos"][1]
+                self._cur_x = rel_x * _CELL_SIZE * CAMERA_SENSITIVITY
+                self._cur_z = rel_y * _CELL_SIZE * CAMERA_SENSITIVITY
+                print(f"[DEBUG] rel=({rel_x:.3f},{rel_y:.3f})  cursor=({self._cur_x:.3f},{self._cur_z:.3f})  grid_edge={_CELL_SIZE:.2f}")
+            else:
+                acc_x = frame_data["acc"][0]
+                acc_y = frame_data["acc"][1]
+                target_x = acc_x * 0.30
+                target_z = acc_y * 0.30
+                self._cur_x = self._ema_alpha * target_x + (1 - self._ema_alpha) * self._cur_x
+                self._cur_z = self._ema_alpha * target_z + (1 - self._ema_alpha) * self._cur_z
 
         # ── FSR pressure -> whack ─────────────────────────────────────────
         if frame_data is not None:
@@ -344,12 +354,16 @@ class WhackAMoleTask(BaseTask):
         self._mole_nodes[idx].setPos(gx, world_y, gz - 0.80)
 
     def _update_cursor(self):
-        # Clamp cursor to board extent
-        cx = max(-_CELL_SIZE * 1.3, min(_CELL_SIZE * 1.3, self._cur_x))
-        cz = max(-_CELL_SIZE * 1.3, min(_CELL_SIZE * 1.3, self._cur_z))
+        # NO clamp — let cursor move freely so we can see if Panda3D rendering works
+        cx = self._cur_x
+        cz = self._cur_z
+
+        if self._debug_label:
+            self._debug_label.setText(f"cursor=({cx:.2f},{cz:.2f})")
 
         if self._cursor_node:
-            self._cursor_node.setPos(cx, _BOARD_Y + 0.35, cz)
+            self._cursor_node.setPos(cx, _BOARD_Y - 0.5, cz)
+            self._cursor_node.setScale(2.0)
 
         # Snap cursor ring to nearest grid cell
         best_i, best_d = 0, float("inf")

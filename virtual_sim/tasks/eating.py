@@ -200,17 +200,18 @@ class EatingTask(BaseTask):
                 self._feedback_label.setText("Grip lost!")
                 self._feedback_until = now + 1.5
 
-            acc_x = frame_data["acc"][0]   # lateral tilt  -> left/right
-            acc_y = frame_data["acc"][1]   # vertical swing -> up/down
-
-            # Scale sensor range to comfortable table-space range
-            target_x = acc_x * 0.35         # ±9 m/s^2 -> ±3.15 world units
-            target_z = 1.05 + acc_y * 0.08  # centred above table
-
-            # Camera sends pre-smoothed position — bypass EMA for direct response.
-            alpha = self._ema_alpha if abs(acc_x) < 15.0 else 1.0
-            self._spoon_x = alpha * target_x + (1 - alpha) * self._spoon_x
-            self._spoon_z = alpha * target_z + (1 - alpha) * self._spoon_z
+            if "pos" in frame_data:
+                # Camera mode: pos is calibration-relative [-1,1]
+                # Centre (0,0) = spoon at (0, 1.45), covers full play area
+                self._spoon_x = frame_data["pos"][0] * 1.5
+                self._spoon_z = 1.45 + frame_data["pos"][1] * 0.55
+            else:
+                acc_x = frame_data["acc"][0]
+                acc_y = frame_data["acc"][1]
+                target_x = acc_x * 0.35
+                target_z = 1.05 + acc_y * 0.08
+                self._spoon_x = self._ema_alpha * target_x + (1 - self._ema_alpha) * self._spoon_x
+                self._spoon_z = self._ema_alpha * target_z + (1 - self._ema_alpha) * self._spoon_z
 
         self._update_spoon_node()
         self._update_highlights()
