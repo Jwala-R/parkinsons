@@ -21,7 +21,6 @@ For camera mode: `pip install mediapipe opencv-python`
 | Camera | `--mode camera` | Webcam + hand tracking (no Arduino) |
 
 ### Quick start (no hardware)
-
 ```bash
 python virtual_sim/main.py --task eating --mode demo
 python virtual_sim/main.py --task whackamole --mode demo
